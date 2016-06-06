@@ -9,8 +9,8 @@ The installer follows these steps :
 
 1. Install Node.js
 2. Install the EveConnector modules (with npm)
-  * eve-connector
-  * node-windows
+  * [eve-connector](https://github.com/libre-informatique/EveConnector)
+  * [node-windows](https://github.com/coreybutler/node-windows)
 3. Install and run EveConnector as a Windows service
 4. Install WinUSB generic drivers for some devices:
   * TSP700II Star Microtronics thermal printer
