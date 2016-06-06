@@ -19,11 +19,13 @@ The installer follows these steps :
 
 ## How to compile it ?  
 
-Compile the script setup2.iss with Inno Setup Compiler
+Compile the script setup2.iss with [Inno Setup Compiler](https://www.kymoto.org/products/inno-script-studio)
 
 ## How to use it ?
 
-You can lauch the installer and follow the Wizard steps with the following optional options :
+You can launch the installer with the following optional parameters :
 
 * /VERYSILENT
 * /PROXY=myproxy:myport
+
+More available parameters here : http://www.jrsoftware.org/ishelp/index.php?topic=setupcmdline
