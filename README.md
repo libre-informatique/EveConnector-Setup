@@ -25,7 +25,7 @@ Compile the script setup2.iss with [Inno Setup Compiler](https://www.kymoto.org/
 
 You can launch the installer with the following optional parameters :
 
-* /VERYSILENT
-* /PROXY=myproxy:myport
+* `/VERYSILENT` (disables the installation wizard windows, no user interaction)
+* `/PROXY=myproxy:myport` (proxy settings for npm)
 
 More available parameters here : http://www.jrsoftware.org/ishelp/index.php?topic=setupcmdline
