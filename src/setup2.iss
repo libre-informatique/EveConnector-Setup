@@ -14,7 +14,7 @@ UsePreviousTasks=False
 FlatComponentsList=False
 AlwaysShowComponentsList=True
 ShowComponentSizes=False
-OutputDir=C:\Users\libre-info\Desktop\EVE-CONNECTOR\Output
+OutputDir=C:\Users\libre-info\Desktop\EveConnector-Setup\src\Output
 DisableStartupPrompt=True
 ; When set to none, Setup will use the first language specified in the [Languages] section as the default language.
 LanguageDetectionMethod=none 
@@ -35,16 +35,16 @@ Name: "{app}\eve-connector-win\node_modules"; Components: eveconnector
 
 [Files]
 ; Node.js installer
-Source: "node-v4.4.3-x86.msi"; DestDir: "{app}"; Flags: ignoreversion; Components: node; AfterInstall: InstallNode
+Source: "node-v4.4.5-x64.msi"; DestDir: "{app}"; Flags: ignoreversion; Components: node; AfterInstall: InstallNode
 ; EveConnector
 Source: "eve-connector-win\config.js"; DestDir: "{app}\eve-connector-win\"; Flags: ignoreversion; Components: eveconnector
 Source: "eve-connector-win\main.js"; DestDir: "{app}\eve-connector-win\"; Flags: ignoreversion; Components: eveconnector
 Source: "eve-connector-win\server.js"; DestDir: "{app}\eve-connector-win\"; Flags: ignoreversion; Components: eveconnector; AfterInstall: InstallEveConnector
 ; Boca printer
-Source: "Drivers\HP46_Thermal_Printer\InstallDriver.exe"; DestDir: "{app}\Drivers\HP46_Thermal_Printer\"; Flags: ignoreversion; Components: winusb/printers/boca
+Source: "Drivers\HP46_Thermal_Printer\InstallDriver.exe"; DestDir: "{app}\Drivers\HP46_Thermal_Printer\"; Flags: ignoreversion; Components: winusb/printers/boca; AfterInstall: InstallDriver('HP46_Thermal_Printer')
 ; Star printer
 Source: "Drivers\TSP743II_STR_T-001\InstallDriver.exe"; DestDir: "{app}\Drivers\TSP743II_STR_T-001\"; Flags: ignoreversion; Components: winusb/printers/tsp700; AfterInstall: InstallDriver('TSP743II_STR_T-001')
-; Star printer
+; Star display
 Source: "Drivers\SCD122U\InstallDriver.exe"; DestDir: "{app}\Drivers\SCD122U\"; Flags: ignoreversion; Components: winusb/displays/star; AfterInstall: InstallDriver('SCD122U')
 
 [Icons]
@@ -65,6 +65,9 @@ Name: "winusb/displays/star"; Description: "Afficheur Star SCD122U"; Types: full
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}/eve-connector-win"; Components: eveconnector
 
+[ThirdParty]
+UseRelativePaths=True
+
 [Code]
 
 var
@@ -75,6 +78,7 @@ procedure Test();
 begin
   MsgBox('Test:' #13#13 'Bye bye!', mbInformation, MB_OK);
 end;
+
 
 // ***********************************************
 // util method, equivalent to C# string.StartsWith
@@ -114,6 +118,8 @@ begin
    end;
 end;
 
+
+
 // *******************************
 // Gets the Node.js installer mode 
 // (passive = only progress bar / quiet = no windows at all)
@@ -139,6 +145,8 @@ begin
     Result := NodeDir() + '\npm';
 end;
 
+
+
 // ******************************
 // Stops the EveConnector service
 function StopService(): Boolean;
@@ -149,6 +157,8 @@ begin
   Result := ShellExec('runas', NodeExe(), 'main.js stop', ExpandConstant('{app}\eve-connector-win'), 
     SW_HIDE, ewWaitUntilTerminated, errorCode);
 end;
+
+
 
 // ******************************
 // Uninstall the EveConnector service
@@ -161,38 +171,7 @@ begin
     SW_HIDE, ewWaitUntilTerminated, errorCode);
 end;
 
-function InitializeSetup(): Boolean;
-begin
-   aborted := False;
-   errorMessage := '';
-   Result := True;
-end;
 
-function PrepareToInstall(var NeedsRestart: Boolean): String;
-begin
-  if IsComponentSelected('node') or IsComponentSelected('eveconnector') then
-  begin
-    StopService();
-  end;
-  Result := ''; // Return a non empty string (message) to abort
-end;
-
-procedure CurStepChanged(CurStep: TSetupStep);
-begin
-  Log('CurStepChanged(' + IntToStr(Ord(CurStep)) + ') called');
-  if aborted then 
-  begin
-    if not WizardSilent then 
-      MsgBox(errorMessage + '#13#10#13#10Abandon de l''installation de EveConnector.', mbCriticalError, MB_OK);
-    Log('Aborting install');
-    Abort();
-  end;
-
-  if CurStep = ssPostInstall then
-  begin
-    
-  end;
-end;
 
 
 // ************************
@@ -206,7 +185,7 @@ begin
   Log('InstallNode() called');
   if aborted then exit;
 
-  installer := ExpandConstant('"{app}\node-v4.4.3-x86.msi"');
+  installer := ExpandConstant('"{app}\node-v4.4.5-x64.msi"');
   installMode := '/passive';
   showWindow := SW_SHOW;
   if WizardSilent then
@@ -226,6 +205,7 @@ begin
 end;
 
 
+
 // **************************
 // Uninstalls Node.js and npm
 procedure UninstallNode();
@@ -236,9 +216,9 @@ var
 begin
   Log('UninstallNode() called');
 
-  installer := ExpandConstant('"{app}\node-v4.4.3-x86.msi"');
-  installMode := '/quiet';
-  showWindow := SW_HIDE;
+  installer := ExpandConstant('"{app}\node-v4.4.5-x64.msi"');
+  installMode := '/passive';
+  showWindow := SW_SHOW;
   res := ShellExec('runas', 'msiexec.exe',
     '/x ' + installer + ' INSTALLDIR="' + NodeDir() + '" ' + installMode, 
     '', showWindow, ewWaitUntilTerminated, errorCode);
@@ -247,6 +227,8 @@ begin
     Log(errorMessage);
   end;
 end;
+
+
 
 // ***********************************************
 // Installs eve-connector and node-windows modules
@@ -260,23 +242,93 @@ begin
   Log('InstallEveConnector() called');
   if aborted then exit;
 
-  // Set proxy settings for npm
-  Log('Configuring proxy for npm ("' + proxy + '")...');
+  
   proxy := GetCommandlineParam('/PROXY');
-  if proxy <> '' then 
+  if proxy <> '' then      
+    // Set proxy settings for npm
     begin
+      Log('Configuring proxy for npm ("' + proxy + '")...');
       proxy := 'http://' + proxy;
-      res := ShellExec('runas', NpmExe(), 'config set proxy "' + proxy + '"', ExpandConstant('{app}\eve-connector-win'), 
+                
+      res := ShellExec('runas', NpmExe(), 'config set proxy ' + proxy, ExpandConstant('{app}\eve-connector-win'), 
         SW_HIDE, ewWaitUntilTerminated, errorCode);
-      res := ShellExec('runas', NpmExe(), 'config set https-proxy "' + proxy + '"', ExpandConstant('{app}\eve-connector-win'), 
+      if not res then
+        begin
+          errorMessage := 'Configuring http proxy for npm FAILED (ShellExec returned false)';
+          aborted := True;
+        end
+      else if errorCode <> 0 then
+        begin
+          errorMessage := Format('Configuring http proxy for npm FAILED: errorCode %d', [errorCode]);
+          aborted := True;  
+        end
+      else
+        Log(Format('Configuring http proxy for npm DONE OK (%s)', [proxy]))
+      
+      res := ShellExec('runas', NpmExe(), 'config set https-proxy ' + proxy, ExpandConstant('{app}\eve-connector-win'), 
         SW_HIDE, ewWaitUntilTerminated, errorCode);
+      if not res then
+        begin
+          errorMessage := 'Configuring https proxy for npm FAILED (ShellExec returned false)';
+          aborted := True;
+        end
+      else if errorCode <> 0 then
+        begin
+          errorMessage := Format('Configuring https proxy for npm FAILED: errorCode %d', [errorCode]);
+          aborted := True;  
+        end
+      else
+        Log(Format('Configuring https proxy for npm DONE OK (%s)', [proxy]))
+      
+      if aborted then
+      begin
+        Log(errorMessage);
+        errorMessage := 'Le paramétrage du proxy pour NPM a échoué';
+        exit;
+      end;
     end
+
   else
+    // Set proxy settings for npm
     begin
+      Log('Clearing proxy settings for npm...');
+
       res := ShellExec('runas', NpmExe(), 'config rm proxy', ExpandConstant('{app}\eve-connector-win'), 
         SW_HIDE, ewWaitUntilTerminated, errorCode);
+      if not res then
+        begin
+          errorMessage := 'Clearing http proxy settings for npm FAILED (ShellExec returned false)';
+          aborted := True;
+        end
+      else if errorCode <> 0 then
+        begin
+          errorMessage := Format('Clearing http proxy settings for npm FAILED: errorCode %d', [errorCode]);
+          aborted := True;  
+        end
+      else
+        Log('Clearing http proxy settings for npm DONE OK');
+
       res := ShellExec('runas', NpmExe(), 'config rm https-proxy', ExpandConstant('{app}\eve-connector-win'), 
         SW_HIDE, ewWaitUntilTerminated, errorCode);
+      if not res then
+        begin
+          errorMessage := 'Clearing https proxy settings for npm FAILED (ShellExec returned false)';
+          aborted := True;
+        end
+      else if errorCode <> 0 then
+        begin
+          errorMessage := Format('Clearing https proxy settings for npm FAILED: errorCode %d', [errorCode]);
+          aborted := True;  
+        end
+      else
+        Log('Clearing http proxy settings for npm DONE OK');
+
+      if aborted then
+      begin
+        errorMessage := 'Le nettoyage des paramètres de proxy pour NPM a échoué';
+        Log(errorMessage);
+        exit;
+      end;
     end;
 
   // Install eve-connector module (npm)
@@ -284,38 +336,68 @@ begin
   res := ShellExec('runas', NpmExe(), 'install eve-connector', ExpandConstant('{app}\eve-connector-win'), 
     SW_HIDE, ewWaitUntilTerminated, errorCode);
   if not res then 
-  begin
-    errorMessage := 'L''installation du module eve-connector échoué: ' + IntToStr(errorCode);
-    Log(errorMessage);
-    aborted := True;
-    exit;
-  end;
+    begin
+      errorMessage := 'npm install eve-connector FAILED (ShellExec returned false)';
+      Log(errorMessage);
+      aborted := True;
+      exit;
+    end
+  else if errorCode <> 0 then
+    begin
+      errorMessage := Format('npm install eve-connector FAILED: errorCode %d', [errorCode]);
+      Log(errorMessage);
+      aborted := True;
+      exit;
+    end
+  else
+    Log('npm install eve-connector DONE OK');
 
   // Install node-windows module (npm)
   Log('Installing node-windows module (npm)...');
   res := ShellExec('runas', NpmExe(), 'install node-windows', ExpandConstant('{app}\eve-connector-win'), 
     SW_HIDE, ewWaitUntilTerminated, errorCode);
   if not res then 
-  begin
-    errorMessage := 'L''installation du module eve-connector échoué: ' + IntToStr(errorCode);
-    Log(errorMessage);
-    aborted := True;
-    exit;
-  end;
+    begin
+      errorMessage := 'npm install node-windows FAILED (ShellExec returned false)';
+      Log(errorMessage);
+      aborted := True;
+      exit;
+    end
+  else if errorCode <> 0 then
+    begin
+      errorMessage := Format('npm install node-windows FAILED: errorCode %d', [errorCode]);
+      Log(errorMessage);
+      aborted := True;
+      exit;
+    end
+  else
+    Log('npm install node-windows DONE OK');
 
   // Install and start the EveConnector service
   Log('Installing and starting EveConnector service...');
   res := ShellExec('runas', NodeExe(), 'main.js', ExpandConstant('{app}\eve-connector-win'), 
     SW_HIDE, ewWaitUntilTerminated, errorCode);
   if not res then 
-  begin
-    errorMessage := 'L''installation du module eve-connector échoué: ' + IntToStr(errorCode);
-    Log(errorMessage);
-    aborted := True;
-    exit;
-  end;
+    begin
+      errorMessage := 'EveConnector service installation FAILED  (ShellExec returned false)';
+      Log(errorMessage);
+      aborted := True;
+      exit;
+    end
+  else if errorCode <> 0 then
+    begin
+      errorMessage := Format('EveConnector service installation FAILED: errorCode %d', [errorCode]);
+      Log(errorMessage);
+      aborted := True;
+      exit;
+    end
+  else
+    Log('EveConnector service installed OK');
  end;
 
+
+
+// Install WinUSB drivers
 procedure InstallDriver(dir: String);
   var 
     path: String;
@@ -326,10 +408,45 @@ begin
   path := ExpandConstant(Format('{app}\Drivers\%s', [dir]));
   res := ShellExec('runas', path + '\InstallDriver.exe', '', path, 
     SW_HIDE, ewWaitUntilTerminated, errorCode);
-  Log(Format('exit code = %d', [errorCode]));
   if not res then
     Log(Format('ERR: Could not install driver %s', [dir]));
 end;
+
+
+
+function InitializeSetup(): Boolean;
+begin
+   aborted := False;
+   errorMessage := '';
+   Result := True;
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  if IsComponentSelected('node') or IsComponentSelected('eveconnector') then
+  begin
+    StopService();
+  end;
+  Result := ''; // Return a non empty string (message) to abort 
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  Log('CurStepChanged(' + IntToStr(Ord(CurStep)) + ') called');
+  if aborted then 
+  begin
+    if not WizardSilent then 
+      MsgBox(errorMessage + ' / Abandon de l''installation de EveConnector.', mbCriticalError, MB_OK);
+    Log('Aborting install');
+    Abort();
+  end;
+
+  if CurStep = ssPostInstall then
+  begin
+    
+  end;
+end;
+
 
 function InitializeUninstall(): Boolean;
 begin

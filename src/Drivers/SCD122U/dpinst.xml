@@ -17,5 +17,5 @@ Dpinst.xml Example:
 	<forceIfDriverIsNotBetter>1</forceIfDriverIsNotBetter>
 	<installAllOrNone>1</installAllOrNone>
 	<quietInstall/>
-	<suppressWizard/>
+  <suppressWizard/>	
 </dpinst>
